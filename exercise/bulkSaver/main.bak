@@ -1,0 +1,142 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"os"
+
+	"github.com/joho/godotenv"
+	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+type Payload struct {
+	Id string `json:"id"`
+}
+
+type TrendMessage struct {
+	Id string
+}
+
+func main() {
+	// Get config
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Println("Error: No .env file found")
+		os.Exit(1)
+	}
+
+	rabbitMqUri := os.Getenv("RABBITMQ_URI")
+
+	// Consume payload from the queue
+	// timeout := time.Second * 100000
+	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// trendMessages := []TrendMessage{}
+	handler := func(ctx context.Context, payload amqp.Delivery) {
+		// Transform the payload into Trend message
+		data := Payload{}
+		if err := json.Unmarshal(payload.Body, &data); err != nil {
+			log.Println("Hello")
+
+			log.Panic("Cannot parse payload to spider message" + err.Error())
+		}
+		log.Println("Receive payload: ", data)
+	}
+	// handler := func(ctx context.Context, payload amqp.Delivery) {
+	// 	// Transform the payload into Trend message
+	// 	data := Payload{}
+	// 	if err := json.Unmarshal(payload.Body, &data); err != nil {
+	// 		log.Panic("Cannot parse payload to spider message" + err.Error())
+	// 	}
+	// 	log.Println("Receive payload: ", data)
+
+	// 	trendMessages = append(trendMessages, TrendMessage(data))
+	// 	log.Println("Bulk: ", trendMessages)
+
+	// 	// Save the message into the database
+	// 	mongoDbUri := os.Getenv("MONGODB_URI")
+	// 	dbName := "golang_exercise"
+	// 	collectionName := "messages"
+
+	// 	bulkSize := 10
+	// 	if len(trendMessages) == bulkSize {
+	// 		log.Println("Bulk size reached, save!")
+	// 		if err := bulkSave(mongoDbUri, dbName, collectionName, trendMessages); err != nil {
+	// 			log.Panic("Cannot transform payload to Trend message" + err.Error())
+	// 		}
+	// 		trendMessages = []TrendMessage{}
+	// 	}
+
+	// 	if ctx.Err() == context.DeadlineExceeded {
+	// 		log.Println("Timeout reached, save!")
+	// 		if err := bulkSave(mongoDbUri, dbName, collectionName, trendMessages); err != nil {
+	// 			log.Panic("Cannot transform payload to Trend message" + err.Error())
+	// 		}
+	// 		trendMessages = []TrendMessage{}
+	// 	}
+
+	// }
+
+	queueName := "spider:msg"
+	consume(ctx, rabbitMqUri, queueName, handler)
+
+}
+
+func consume(ctx context.Context, uri string, queueName string, handler func(ctx context.Context, payload amqp.Delivery)) {
+	conn, err := amqp.Dial(uri)
+	if err != nil {
+		log.Panic("cannot connect to rabbitmq, " + err.Error())
+	}
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Panic("cannot connect to rabbitmq channel, " + err.Error())
+	}
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		queueName, // name
+		false,     // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
+	)
+	if err != nil {
+		log.Panic("cannot create queue, " + err.Error())
+	}
+
+	msgs, err := ch.Consume(
+		q.Name, // queue
+		"",     // consumer
+		true,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+	if err != nil {
+		log.Panic("cannot consume payload from the queue, " + err.Error())
+	}
+
+	var forever chan struct{}
+
+	go func() {
+		for d := range msgs {
+			handler(ctx, d)
+		}
+	}()
+
+	log.Printf("waiting for messages, press ctrl+c to exit")
+	<-forever
+}
+
+// TODO: Save to the database
+func bulkSave(uri string, dbName string, collectionName string, trendMessages []TrendMessage) error {
+	log.Println("Save Trend message: ", trendMessages)
+
+	return nil
+}

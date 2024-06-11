@@ -1,0 +1,29 @@
+services:
+  local-mongo:
+    image: mongo:6
+    container_name: local-mongo
+    ports:
+      - 27017:27017
+    networks:
+      - golang-exercise
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: 'root'
+      MONGO_INITDB_ROOT_PASSWORD: 'root'
+    restart: on-failure
+
+  local-rabbitmq:
+    image: rabbitmq:3.13.3-management
+    container_name: local-rabbitmq
+    ports:
+      - "5672:5672"     # RabbitMQ default port
+      - "15672:15672"   # RabbitMQ management interface
+    networks:
+      - golang-exercise
+    environment:
+      RABBITMQ_DEFAULT_USER : 'root'
+      RABBITMQ_DEFAULT_PASS : 'root'
+    restart: on-failure
+
+
+networks:
+  golang-exercise:
