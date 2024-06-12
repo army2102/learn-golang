@@ -80,7 +80,6 @@ func validateGetMessagesInput(input GetMessageInput) error {
 // รู้สึกว่ามี Primative Type ที่มีหลาย Variation ควรมีการเลือกใช้อย่างไร, Present: Function อยากได้อะไรก็ Cast เป็นอันนั้นให้
 // Context คืออะไร ใช้งานอย่างไร ใช้เมื่อไหร่, Present: ใส่ไปก่อนเพื่อให้ Code run ผ่าน
 func getMessages(uri string, page int, pageSize int) (MessagePagination, error) {
-
 	// Validate uri (config)
 	if uri == "" {
 		err := errors.New("invalid uri")
@@ -111,7 +110,6 @@ func getMessages(uri string, page int, pageSize int) (MessagePagination, error) 
 	}
 
 	filter := bson.M{}
-
 	totalItems, err := coll.CountDocuments(context.TODO(), filter)
 	if err != nil {
 		return MessagePagination{}, err

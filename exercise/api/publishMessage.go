@@ -12,15 +12,18 @@ import (
 )
 
 type PublishMessageInput struct {
-	Id string `json:"id"`
+	Id         string `json:"id"`
+	SpiderData string `json:"spiderData"`
 }
 
 type SpiderMessage struct {
-	Id string
+	Id         string
+	SpiderData string
 }
 
-type Payload struct {
-	Id string `json:"id"`
+type TransformerPayload struct {
+	Id         string `json:"id"`
+	SpiderData string `josn:"spiderData"`
 }
 
 func publishMessageHandler(c *fiber.Ctx) error {
@@ -91,7 +94,7 @@ func publishMessage(uri string, queueName string, message SpiderMessage) error {
 		return errors.New("cannot create queue, " + err.Error())
 	}
 
-	body, err := json.Marshal(Payload(message))
+	body, err := json.Marshal(TransformerPayload(message))
 	if err != nil {
 		return errors.New("cannot parse message to json, " + err.Error())
 	}

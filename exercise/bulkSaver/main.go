@@ -15,17 +15,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Payload struct {
-	Id string `json:"id"`
+type BulkSaverPayload struct {
+	Id        string `json:"id"`
+	TrendData string `json:"trendData"`
 }
 
 type TrendMessage struct {
-	Id string
+	Id        string
+	TrendData string
 }
 
 type TrendMessageMongo struct {
-	Id   primitive.ObjectID `bson:"_id"`
-	Data string             `bson:"data"`
+	Id        primitive.ObjectID `bson:"_id"`
+	TrendData string             `bson:"trendData"`
 }
 
 // เมื่อไหร่ควร Pass by value เมื่อไหร่ควร Pass by reference, Present: Pass by value กับทุกอย่างยกเว้นเป็น Reference Type อยู่แล้ว
@@ -49,7 +51,7 @@ func main() {
 			select {
 			case d := <-payload:
 				// Transform the payload into Trend message
-				data := Payload{}
+				data := BulkSaverPayload{}
 				if err := json.Unmarshal(d.Body, &data); err != nil {
 					log.Panic("Cannot parse payload to spider message" + err.Error())
 				}
@@ -172,8 +174,8 @@ func bulkInsert(uri string, dbName string, collectionName string, trendMessages 
 	docs := make([]interface{}, len(trendMessages))
 	for index, message := range trendMessages {
 		docs[index] = TrendMessageMongo{
-			Id:   primitive.NewObjectID(),
-			Data: message.Id,
+			Id:        primitive.NewObjectID(),
+			TrendData: message.TrendData,
 		}
 	}
 

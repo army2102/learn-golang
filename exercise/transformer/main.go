@@ -12,12 +12,19 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type Payload struct {
-	Id string `json:"id"`
+type TransformPayload struct {
+	Id         string `json:"_id"`
+	SpiderData string `json:"spiderData"`
 }
 
 type TrendMessage struct {
-	Id string
+	Id        string
+	TrendData string
+}
+
+type BulkSaverPayload struct {
+	Id        string `json:"id"`
+	TrendData string `json:"trendData"`
 }
 
 // เมื่อไหร่ควร Pass by value เมื่อไหร่ควร Pass by reference, Present: Pass by value กับทุกอย่างยกเว้นเป็น Reference Type อยู่แล้ว
@@ -36,16 +43,13 @@ func main() {
 
 	handler := func(ctx context.Context, payload amqp.Delivery) {
 		// Transform the payload into Trend message
-		data := Payload{}
+		data := TransformPayload{}
 		if err := json.Unmarshal(payload.Body, &data); err != nil {
 			log.Panic("Cannot parse payload to spider message" + err.Error())
 		}
 		log.Println("Receive payload: ", data)
 
-		trendMessage, err := transformToTrendMessage(data)
-		if err != nil {
-			log.Panic("Cannot transform payload to Trend message" + err.Error())
-		}
+		trendMessage := transformToTrendMessage(data)
 
 		// Publish Trend message to the bulk worker
 		queueName := "bulk:msg"
@@ -135,7 +139,7 @@ func publish(uri string, queueName string, trendMessage TrendMessage) error {
 		return errors.New("cannot create queue, " + err.Error())
 	}
 
-	body, err := json.Marshal(Payload(trendMessage))
+	body, err := json.Marshal(BulkSaverPayload(trendMessage))
 	if err != nil {
 		return errors.New("cannot parse message to json, " + err.Error())
 	}
@@ -158,10 +162,11 @@ func publish(uri string, queueName string, trendMessage TrendMessage) error {
 	return nil
 }
 
-// TODO: Define a Spider message struct & Trend struct
-// TODO: Transform
-func transformToTrendMessage(spiderMessagePayload Payload) (TrendMessage, error) {
-	trendMessage := TrendMessage(spiderMessagePayload)
+func transformToTrendMessage(spiderMessagePayload TransformPayload) TrendMessage {
+	trendMessage := TrendMessage{
+		Id:        spiderMessagePayload.Id,
+		TrendData: spiderMessagePayload.SpiderData,
+	}
 
-	return trendMessage, nil
+	return trendMessage
 }
