@@ -38,18 +38,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Consume payload from the queue
+	// Get payload from the queue and put into a channel
 	rabbitMqUri := os.Getenv("RABBITMQ_URI")
 	queueName := "bulk:msg"
+	messageChannel := make(chan amqp.Delivery)
+	go consume(rabbitMqUri, queueName, messageChannel)
+
 	trendMessages := []TrendMessage{}
-	handler := func(ctx context.Context, payload <-chan amqp.Delivery) {
+	handler := func(ctx context.Context, messageChannel <-chan amqp.Delivery) {
 		mongoDbUri := os.Getenv("MONGODB_URI")
 		dbName := "golang_exercise"
 		collectionName := "messages"
 
 		for {
 			select {
-			case d := <-payload:
+			case d := <-messageChannel:
 				// Transform the payload into Trend message
 				data := BulkSaverPayload{}
 				if err := json.Unmarshal(d.Body, &data); err != nil {
@@ -86,12 +89,19 @@ func main() {
 
 	}
 
-	handlerTimeout := time.Second * 10
-	consume(rabbitMqUri, queueName, handler, handlerTimeout)
+	// Handler receive message from the channel and processed it
+	for {
+		timeout := time.Second * 10
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+		handler(ctx, messageChannel)
+
+		cancel()
+	}
 
 }
 
-func consume(uri string, queueName string, handler func(ctx context.Context, payload <-chan amqp.Delivery), handlerTimeout time.Duration) {
+func consume(uri string, queueName string, channel chan<- amqp.Delivery) {
 	conn, err := amqp.Dial(uri)
 	if err != nil {
 		log.Panic("cannot connect to rabbitmq, " + err.Error())
@@ -116,7 +126,7 @@ func consume(uri string, queueName string, handler func(ctx context.Context, pay
 		log.Panic("cannot create queue, " + err.Error())
 	}
 
-	msgs, err := ch.Consume(
+	messageChannel, err := ch.Consume(
 		q.Name, // queue
 		"",     // consumer
 		true,   // auto-ack
@@ -132,13 +142,8 @@ func consume(uri string, queueName string, handler func(ctx context.Context, pay
 	var forever chan struct{}
 
 	go func() {
-		for {
-			ctxTimeout, cancel := context.WithTimeout(context.TODO(), handlerTimeout)
-
-			handler(ctxTimeout, msgs)
-
-			cancel()
-			log.Println("Timeout reached, restarting timeout period")
+		for message := range messageChannel {
+			channel <- message
 		}
 	}()
 
